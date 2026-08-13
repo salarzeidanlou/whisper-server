@@ -49,7 +49,7 @@ jobs:
         run: ruff check .
 
       - name: Run tests
-        run: pytest
+        run: python -m pytest
 
       - name: Compile Python sources
         run: python -m compileall -q app alembic tests
