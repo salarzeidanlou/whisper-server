@@ -1,0 +1,79 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    ports:
+      - "127.0.0.1:5433:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER}"]
+      interval: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    command: redis-server --requirepass ${REDIS_PASSWORD}
+    environment:
+      REDISCLI_AUTH: ${REDIS_PASSWORD}
+    ports:
+      - "127.0.0.1:6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      retries: 5
+
+  api:
+    build: .
+    ports:
+      - "8000:8000"
+    environment:
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379/0
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY}
+      JWT_ALGORITHM: ${JWT_ALGORITHM:-HS256}
+      JWT_EXPIRE_DAYS: ${JWT_EXPIRE_DAYS:-7}
+      LOGIN_RATE_LIMIT: ${LOGIN_RATE_LIMIT:-5}
+      LOGIN_RATE_WINDOW: ${LOGIN_RATE_WINDOW:-300}
+      CORS_ORIGINS: ${CORS_ORIGINS:-}
+      ENVIRONMENT: ${ENVIRONMENT:-production}
+      WS_TICKET_TTL: ${WS_TICKET_TTL:-30}
+      TRUSTED_PROXIES: ${TRUSTED_PROXIES:-}
+      COTURN_REALM: ${COTURN_REALM}
+      COTURN_SECRET: ${COTURN_SECRET}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8000/ready')\""]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+
+  coturn:
+    image: coturn/coturn:4.6-alpine
+    network_mode: host
+    restart: unless-stopped
+    command:
+      - --no-config
+      - --listening-port=3478
+      - --external-ip=${COTURN_EXTERNAL_IP}
+      - --realm=${COTURN_REALM}
+      - --server-name=${COTURN_REALM}
+      - --use-auth-secret
+      - --static-auth-secret=${COTURN_SECRET}
+      - --min-port=49152
+      - --max-port=65535
+      - --no-multicast-peers
+      - --denied-peer-ip=127.0.0.0-127.255.255.255
+      - --log-file=stdout
+
+volumes:
+  pgdata:
