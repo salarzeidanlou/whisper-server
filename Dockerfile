@@ -1,4 +1,4 @@
-FROM python:3.11-slim
+FROM python:3.14-slim
 
 LABEL org.opencontainers.image.source="https://github.com/salarzeidanlou/whisper-server" \
       org.opencontainers.image.description="Self-hosted relay for end-to-end encrypted messaging and WebRTC signaling" \
