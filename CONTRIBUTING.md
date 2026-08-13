@@ -28,7 +28,7 @@ Run the checks that match your change before opening a pull request:
 
 ```bash
 ruff check .
-pytest
+python -m pytest
 python -m compileall -q app alembic
 python -m pip check
 docker compose --env-file .env.example config --quiet
